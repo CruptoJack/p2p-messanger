@@ -3,19 +3,23 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/p2p-messanger/internal/models"
 	"github.com/p2p-messanger/internal/repository"
+	"github.com/p2p-messanger/pkg/config"
 )
 
 type AuthService struct {
 	userRepo repository.UserRepository
+	jwtCfg   config.JWT
 }
 
-func NewAuthService(userRepo repository.UserRepository) *AuthService {
-	return &AuthService{userRepo: userRepo}
+func NewAuthService(userRepo repository.UserRepository, jwtCfg config.JWT) *AuthService {
+	return &AuthService{userRepo: userRepo, jwtCfg: jwtCfg}
 }
 
 func (as *AuthService) RegistUser(login, password string) (*models.User, error) {
@@ -44,5 +48,25 @@ func (s *AuthService) LoginUser(login, password string) (*models.User, error) {
 	if err != nil {
 		return nil, fmt.Errorf("user not found:%w", err)
 	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
+	if err != nil {
+		return nil, fmt.Errorf("invalid password:%w", err)
+	}
+
 	return user, nil
+}
+
+func (as *AuthService) GenerateToken(user *models.User) (string, error) {
+
+	claims := jwt.MapClaims{
+		"user_id": user.ID,
+		"login":   user.Login,
+		"exp":     time.Now().Add(as.jwtCfg.Expire).Unix(),
+		"iat":     time.Now().Unix(),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	return token.SignedString([]byte(as.jwtCfg.SecretKey))
 }
