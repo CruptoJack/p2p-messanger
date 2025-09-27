@@ -70,3 +70,14 @@ func (as *AuthService) GenerateToken(user *models.User) (string, error) {
 
 	return token.SignedString([]byte(as.jwtCfg.SecretKey))
 }
+
+func (as *AuthService) ValidateToken(tokenStr string) (*jwt.Token, error) {
+	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+		return []byte(as.jwtCfg.SecretKey), nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return token, nil
+}
